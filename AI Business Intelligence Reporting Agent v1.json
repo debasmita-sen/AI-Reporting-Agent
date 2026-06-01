@@ -1,0 +1,259 @@
+{
+  "name": "AI Business Intelligence Reporting Agent v1",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -464,
+        -608
+      ],
+      "id": "0c61b975-58be-41f0-869a-3b4de51c8d39",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "fileSelector": "C:\\Users\\User\\.n8n-files\\sales_data2.xlsx",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        -256,
+        -608
+      ],
+      "id": "adb55724-a7bb-4c9b-8572-f3f0fc12339f",
+      "name": "Read/Write Files from Disk"
+    },
+    {
+      "parameters": {
+        "operation": "xlsx",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        -64,
+        -608
+      ],
+      "id": "1c0bc153-a701-4376-bfd7-d9e28e855d62",
+      "name": "Extract from File"
+    },
+    {
+      "parameters": {
+        "jsCode": "let issues = [];\n\nfor (const item of $input.all()) {\n\n  const row = item.json;\n\n  if (!row.Customer_Name || row.Customer_Name === \"N/A\") {\n    issues.push({\n      Order_ID: row.Order_ID,\n      Issue: \"Missing Customer Name\"\n    });\n  }\n\n  if (!row.Quantity || isNaN(Number(row.Quantity))) {\n    issues.push({\n      Order_ID: row.Order_ID,\n      Issue: \"Invalid Quantity\"\n    });\n  }\n\n  if (!row.Unit_Price) {\n    issues.push({\n      Order_ID: row.Order_ID,\n      Issue: \"Missing Unit Price\"\n    });\n  }\n\n  if (Number(row.Quantity) < 0) {\n    issues.push({\n      Order_ID: row.Order_ID,\n      Issue: \"Negative Quantity\"\n    });\n  }\n}\n\nreturn issues.map(i => ({ json: i }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        128,
+        -464
+      ],
+      "id": "05ae441e-f092-459c-a232-b4ecdfbe4688",
+      "name": "Code for Quality Check"
+    },
+    {
+      "parameters": {
+        "jsCode": "const cleaned = [];\n\nfunction cleanDate(value) {\n  if (!value) return \"Unknown Date\";\n\n  let dateText = value.toString().trim();\n\n  // If Excel gives a serial number date\n  if (!isNaN(dateText) && dateText !== \"\") {\n    const excelEpoch = new Date(1899, 11, 30);\n    excelEpoch.setDate(excelEpoch.getDate() + Number(dateText));\n    return excelEpoch.toISOString().split(\"T\")[0];\n  }\n\n  // Handles dates like 3-Jan-25, 19-Jan-25\n  let parsedDate = new Date(dateText);\n\n  if (!isNaN(parsedDate)) {\n    return parsedDate.toISOString().split(\"T\")[0];\n  }\n\n  // Handles dates like 13-01-2025 or 16/01/2025\n  const parts = dateText.split(/[-\\/]/);\n\n  if (parts.length === 3) {\n    let day = parts[0].padStart(2, \"0\");\n    let month = parts[1].padStart(2, \"0\");\n    let year = parts[2];\n\n    if (year.length === 2) {\n      year = \"20\" + year;\n    }\n\n    return `${year}-${month}-${day}`;\n  }\n\n  return \"Invalid Date\";\n}\n\nfor (const item of $input.all()) {\n  let row = item.json;\n\n  // Clean Order Date\n  row.Order_Date = cleanDate(row.Order_Date);\n\n  // Clean Customer Name\n  if (\n    !row.Customer_Name ||\n    row.Customer_Name.toString().trim() === \"\" ||\n    row.Customer_Name.toString().trim().toUpperCase() === \"N/A\"\n  ) {\n    row.Customer_Name = \"Unknown Customer\";\n  } else {\n    row.Customer_Name = row.Customer_Name.toString().trim();\n  }\n\n  // Clean Product\n  if (row.Product) {\n    row.Product = row.Product.toString().trim();\n    row.Product =\n      row.Product.charAt(0).toUpperCase() +\n      row.Product.slice(1).toLowerCase();\n  } else {\n    row.Product = \"Unknown Product\";\n  }\n\n  // Clean Category\n  if (\n    !row.Category ||\n    row.Category.toString().trim() === \"\" ||\n    row.Category.toString().trim().toLowerCase() === \"ta\"\n  ) {\n    row.Category = \"Unknown Category\";\n  } else {\n    row.Category = row.Category.toString().trim();\n  }\n\n  // Clean Quantity\n  let quantity = Number(row.Quantity);\n\n  if (isNaN(quantity) || quantity <= 0) {\n    row.Quantity = 0;\n  } else {\n    row.Quantity = quantity;\n  }\n\n  // Clean Unit Price\n  let unitPrice = Number(row.Unit_Price);\n\n  if (isNaN(unitPrice) || unitPrice <= 0) {\n    row.Unit_Price = 0;\n  } else {\n    row.Unit_Price = unitPrice;\n  }\n\n  // Clean State\n  if (!row.State || row.State.toString().trim() === \"\") {\n    row.State = \"Unknown State\";\n  } else {\n    const state = row.State.toString().toLowerCase().trim();\n\n    if (\n      state === \"wb\" ||\n      state === \"west bengal\" ||\n      state === \"kolkata\"\n    ) {\n      row.State = \"West Bengal\";\n    } else {\n      row.State = row.State.toString().trim();\n    }\n  }\n\n  // Clean Salesperson\n  if (!row.Salesperson || row.Salesperson.toString().trim() === \"\") {\n    row.Salesperson = \"Unknown Salesperson\";\n  } else {\n    row.Salesperson = row.Salesperson.toString().trim();\n  }\n\n  cleaned.push({\n    json: row\n  });\n}\n\nreturn cleaned;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        128,
+        -608
+      ],
+      "id": "fb842241-c172-445f-9417-d960c5b154a6",
+      "name": "Code for Cleaning Data"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all();\n\nlet totalRevenue = 0;\nlet totalOrders = 0;\n\nconst productSales = {};\nconst salespersonSales = {};\n\nfor (const item of rows) {\n\n  const row = item.json;\n\n  const quantity = Number(row.Quantity);\n  const price = Number(row.Unit_Price);\n\n  if (\n    !isNaN(quantity) &&\n    !isNaN(price) &&\n    quantity > 0\n  ) {\n\n    const revenue = quantity * price;\n\n    totalRevenue += revenue;\n    totalOrders++;\n\n    // Product totals\n    if (!productSales[row.Product]) {\n      productSales[row.Product] = 0;\n    }\n\n    productSales[row.Product] += revenue;\n\n    // Salesperson totals\n    if (!salespersonSales[row.Salesperson]) {\n      salespersonSales[row.Salesperson] = 0;\n    }\n\n    salespersonSales[row.Salesperson] += revenue;\n  }\n}\n\nconst topProduct =\n  Object.entries(productSales)\n    .sort((a, b) => b[1] - a[1])[0];\n\nconst topSalesperson =\n  Object.entries(salespersonSales)\n    .sort((a, b) => b[1] - a[1])[0];\n\nreturn [\n  {\n    json: {\n      Total_Orders: totalOrders,\n      Total_Revenue: totalRevenue,\n      Top_Product: topProduct?.[0],\n      Top_Product_Revenue: topProduct?.[1],\n      Top_Salesperson: topSalesperson?.[0],\n      Top_Salesperson_Revenue: topSalesperson?.[1]\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        320,
+        -608
+      ],
+      "id": "a7ceef41-12d3-41a7-aeb4-c19bf3672870",
+      "name": "Code for KPI calculation"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are a Senior Business Intelligence Analyst.\n\nAnalyze the KPI data below and generate a professional report.\n\nKPI Data:\n{{ JSON.stringify($json, null, 2) }}\n\nReturn the report in plain English using the following headings:\n\nExecutive Summary\n\nKey Performance Metrics\n\nBusiness Insights\n\nRisks and Data Quality Observations\n\nRecommendations\n\nDo NOT use markdown symbols such as **, ##, tables, or code blocks.\nWrite the report as normal business text.",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        624,
+        -480
+      ],
+      "id": "00b489f5-491b-4a09-b2f0-c9019d144536",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        624,
+        -288
+      ],
+      "id": "1b9bdec2-9dfd-44ed-bffe-d3dd3b928b6b",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "I28KvudVACvvP6dl",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {
+          "includeBinaries": false
+        }
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        352,
+        -304
+      ],
+      "id": "4ae08af3-bd76-47be-a325-b8ee62c94579",
+      "name": "Aggregate"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        352,
+        -464
+      ],
+      "id": "d79d5806-c251-4fbc-897b-152e4b82afe0",
+      "name": "Convert to File"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read/Write Files from Disk": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "Code for Quality Check",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Code for Cleaning Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code for Quality Check": {
+      "main": [
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code for Cleaning Data": {
+      "main": [
+        [
+          {
+            "node": "Code for KPI calculation",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Convert to File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code for KPI calculation": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "ab740d78-5c9b-4131-9a30-5f45755c8548",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "edc07cf88036de6cfe2ff8222b7acb3f1103fe005e7ef74dc24f3d42f2f0eee3"
+  },
+  "id": "GiVvHlNKKqEwXaIY",
+  "tags": []
+}
