@@ -281,9 +281,6 @@ n8n
 
 **Debasmita Sen**
 
-🎓 MCA Student
-🤖 AI & Python Enthusiast
-
 ### Areas of Interest
 
 * 📊 Business Intelligence
